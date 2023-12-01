@@ -6,9 +6,7 @@ fn main() {
 
 fn process_input(input: &str) -> usize {
     input
-        .trim()
-        .to_string()
-        .split("\n")
+        .lines()
         .map(|x| process_line(x))
         .sum()
 }
