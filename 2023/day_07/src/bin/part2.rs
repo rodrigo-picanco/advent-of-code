@@ -1,6 +1,6 @@
-use itertools::Itertools;
-
+use itertools::{Itertools, Position};
 use nom::IResult;
+use std::u32;
 
 fn main() {
     let input = include_str!("./input1.txt");
@@ -8,17 +8,17 @@ fn main() {
     dbg!(output);
 }
 
-fn process_input(input: &str) -> usize {
+fn process_input(input: &str) -> u32 {
     let (_, games) = parse_input(input).expect("Failed to parse input");
     games
         .iter()
         .sorted_by_key(|(hand, _)| (hand.game, hand.cards))
         .enumerate()
-        .map(|(i, (_, bid))| bid * (i+1))
+        .map(|(i, (_, bid))| bid * (i as u32 + 1))
         .sum()
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, PartialOrd, Ord, Eq)]
+#[derive(Debug, PartialEq, Copy, Clone, Ord, PartialOrd, Eq)]
 enum HandType {
     FiveOfKind = 7,
     FourOfKind = 6,
@@ -33,18 +33,41 @@ impl HandType {
     fn new(cards: Vec<char>) -> Self {
         use HandType::*;
         let counts = cards.iter().sorted().counts();
-        match counts.values().sorted().as_slice() {
-            [1, 1, 1, 1, 1] => HighCard,
-            [1, 1, 1, 2] => OnePair,
-            [1, 2, 2] => TwoPair,
-            [1, 1, 3] => ThreeOfKind,
-            [2, 3] => FullHouse,
-            [1, 4] => FourOfKind,
-            [5] => FiveOfKind,
+
+        let values = if let Some(joker_count) = counts.get(&'J') {
+            if *joker_count == 5 {
+                "5".to_string()
+            } else {
+                counts
+                    .iter()
+                    .filter_map(|(key, value)| (*key != &'J').then_some(value))
+                    .sorted()
+                    .with_position()
+                    .map(|(position, value)| match position {
+                        Position::Last | Position::Only => value + joker_count,
+                        _ => *value,
+                    })
+                    .join("")
+            }
+        } else {
+            counts.values().sorted().join("")
+        };
+
+        match values.as_str() {
+            "11111" => HighCard,
+            "1112" => OnePair,
+            "122" => TwoPair,
+            "113" => ThreeOfKind,
+            "23" => FullHouse,
+            "14" => FourOfKind,
+            "5" => FiveOfKind,
             _ => panic!("Invalid hand"),
         }
     }
 }
+
+type CardScores = (u32, u32, u32, u32, u32);
+type Bid = u32;
 
 #[derive(Debug, PartialEq, Clone)]
 struct Hand {
@@ -61,19 +84,24 @@ impl Hand {
                     'A' => 14,
                     'K' => 13,
                     'Q' => 12,
-                    'J' => 11,
                     'T' => 10,
-                    _ => card.to_digit(10).unwrap() as usize,
+                    '9' => 9,
+                    '8' => 8,
+                    '7' => 7,
+                    '6' => 6,
+                    '5' => 5,
+                    '4' => 4,
+                    '3' => 3,
+                    '2' => 2,
+                    'J' => 1,
+                    _ => panic!("Invalid card"),
                 })
                 .collect_tuple()
                 .unwrap(),
-            game: HandType::new(cards.to_vec()),
+            game: HandType::new(cards),
         }
     }
 }
-
-type CardScores = (usize, usize, usize, usize, usize);
-type Bid = usize;
 
 fn parse_input(input: &str) -> IResult<&str, Vec<(Hand, Bid)>> {
     let (input, output) = nom::multi::many1(nom::sequence::terminated(
@@ -87,7 +115,7 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(Hand, Bid)>> {
 
     let output = output
         .iter()
-        .map(|(cards, bid)| (Hand::new(cards.to_vec()), bid.parse::<usize>().unwrap()))
+        .map(|(cards, bid)| (Hand::new(cards.to_vec()), bid.parse::<u32>().unwrap()))
         .collect::<Vec<_>>();
 
     Ok((input, output))
@@ -127,7 +155,6 @@ mod tests {
             HandType::HighCard
         );
     }
-
     #[test]
     fn test_parse_input() {
         let (_, output) = parse_input(
@@ -138,7 +165,6 @@ KTJJT 220
 QQQJA 483",
         )
         .expect("Failed to parse input");
-
         assert_eq!(
             output,
             vec![
@@ -150,7 +176,6 @@ QQQJA 483",
             ]
         )
     }
-
     #[test]
     fn test_process_input() {
         let input = "32T3K 765
@@ -158,6 +183,6 @@ T55J5 684
 KK677 28
 KTJJT 220
 QQQJA 483";
-        assert_eq!(process_input(input), 6440);
+        assert_eq!(process_input(input), 5905);
     }
 }
