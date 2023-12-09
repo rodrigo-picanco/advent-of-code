@@ -22,12 +22,45 @@ fn process_input(input: &str) -> usize {
         );
     }
 
-   let keys =  schema
+   let result =  schema
         .keys()
-        .filter(|key| key.ends_with("A")).collect();
+        .filter(|key| key.ends_with("A"))
+        .cloned()
+        .map(|key| -> usize {
+            let mut schema = schema.clone();
+            let initial = schema.get(&key).expect("No initial state").clone();
+            schema.insert("initial".to_string(), initial);
+
+            let mut machine = WalkMachine::new(schema);
+            moves.iter().cycle().find_map(|x| -> Option<usize> {
+                machine.walk(x.clone());
+                if machine.state.name.ends_with("Z") {
+                    Some(machine.steps)
+                } else {
+                    None
+                }
+            })
+            .expect("No solution")
+        }).collect::<Vec<usize>>();
+
+   lcm(&result)
 }
 
-type Schema = BTreeMap<String, State>;
+fn lcm(nums: &[usize]) -> usize {
+    if nums.len() == 1 {
+        return nums[0];
+    }
+    let a = nums[0];
+    let b = lcm(&nums[1..]);
+    a * b / gcd_of_two_numbers(a, b)
+}
+
+fn gcd_of_two_numbers(a: usize, b: usize) -> usize {
+    if b == 0 {
+        return a;
+    }
+    gcd_of_two_numbers(b, a % b)
+}type Schema = BTreeMap<String, State>;
 
 #[derive(Debug, PartialEq, Clone)]
 struct State {
