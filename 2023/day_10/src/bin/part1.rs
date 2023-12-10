@@ -5,68 +5,41 @@ fn main() {
 }
 
 fn process(input: &str) -> usize {
-    let matrix = Matrix::new(input);
-    let start = matrix.start();
-
+    let grid = parse(input);
+    let start = grid
+        .iter()
+        .flatten()
+        .find(|tile| tile.is_start)
+        .expect("no start found");
     let mut queue = vec![start.clone()];
     let mut visited = vec![];
-
     while let Some(tile) = queue.pop() {
         let moves = tile.moves();
-        for (_, (x, y)) in moves {
-            let tile = matrix.get(x, y);
-
-            if !visited.contains(tile) && tile.symbol() != Symbol::Ground {
+        for (x, y) in moves {
+            let tile = grid
+                .get(y)
+                .and_then(|row| row.get(x))
+                .expect("tile not found");
+            if !visited.contains(tile) && tile.symbol != Symbol::Ground {
                 queue.push(tile.clone());
                 visited.push(tile.clone());
             }
         }
     }
-
     visited.len() / 2
 }
 
-struct Matrix {
-    values: Vec<Vec<Tile>>,
-}
-
-impl Matrix {
-    fn new(map: &str) -> Self {
-        Self {
-            values: Matrix::parse(map),
-        }
-    }
-
-    fn parse(input: &str) -> Vec<Vec<Tile>> {
-        input
-            .lines()
-            .enumerate()
-            .map(|(y, line)| {
-                line.chars()
-                    .enumerate()
-                    .map(|(x, char)| Tile::new(char, x, y))
-                    .collect::<Vec<_>>()
-            })
-            .collect()
-    }
-
-    fn start(&self) -> &Tile {
-        let tile = self
-            .values
-            .iter()
-            .flatten()
-            .find(|tile| tile.is_start)
-            .expect("no start found");
-
-        tile
-    }
-
-    fn get(&self, x: usize, y: usize) -> &Tile {
-        self.values
-            .get(y)
-            .and_then(|row| row.get(x))
-            .expect("tile not found")
-    }
+fn parse(input: &str) -> Vec<Vec<Tile>> {
+    input
+        .lines()
+        .enumerate()
+        .map(|(y, line)| {
+            line.chars()
+                .enumerate()
+                .map(|(x, char)| Tile::new(char, x, y))
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -93,40 +66,42 @@ enum Symbol {
 struct Tile {
     char: char,
     is_start: bool,
+    symbol: Symbol,
     x: usize,
     y: usize,
 }
 impl Tile {
     fn new(char: char, x: usize, y: usize) -> Self {
+        use Symbol::*;
         Self {
             char,
             is_start: char == 'S',
+            symbol: match char {
+                '|' => Vertical,
+                '-' => Horizontal,
+                'L' => NorthEast,
+                'J' => NorthWest,
+                'F' => SouthEast,
+                '7' => SouthWest,
+                '.' => Ground,
+                'S' => Start,
+                _ => panic!("invalid symbol"),
+            },
             x,
             y,
         }
     }
-
-    fn symbol(&self) -> Symbol {
-        use Symbol::*;
-
-        match self.char {
-            '|' => Vertical,
-            '-' => Horizontal,
-            'L' => NorthEast,
-            'J' => NorthWest,
-            'F' => SouthEast,
-            '7' => SouthWest,
-            '.' => Ground,
-            'S' => Start,
-            _ => panic!("invalid symbol"),
-        }
-    }
-
-    fn is_move_valid(&self, direction: &Direction) -> bool {
+    fn moves(&self) -> Vec<(usize, usize)> {
         use Direction::*;
         use Symbol::*;
-
-        match self.symbol() {
+        vec![
+            (North, (self.x, if self.y > 0 { self.y - 1 } else { 0 })),
+            (South, (self.x, self.y + 1)),
+            (East, (self.x + 1, self.y)),
+            (West, ((if self.x > 0 { self.x - 1 } else { 0 }), self.y)),
+        ]
+        .into_iter()
+        .filter(|(direction, _)| match self.symbol {
             Vertical => match direction {
                 North | South => true,
                 _ => false,
@@ -153,28 +128,9 @@ impl Tile {
             },
             Start => true,
             Ground => false,
-        }
-    }
-
-    fn connections(&self) -> Vec<(Direction, (usize, usize))> {
-        use Direction::*;
-
-        let north = (North, (self.x, if self.y > 0 { self.y - 1 } else { 0 }));
-        let west = (West, ((if self.x > 0 { self.x - 1 } else { 0 }), self.y));
-
-        vec![
-            north,
-            (South, (self.x, self.y + 1)),
-            (East, (self.x + 1, self.y)),
-            west,
-        ]
-    }
-
-    fn moves(&self) -> Vec<(Direction, (usize, usize))> {
-        self.connections()
-            .into_iter()
-            .filter(|(direction, _)| self.is_move_valid(direction))
-            .collect()
+        })
+        .map(|(_, (x, y))| (x, y))
+        .collect()
     }
 }
 
@@ -183,8 +139,6 @@ mod tests {
     use super::*;
     #[test]
     fn test_moves() {
-        use Direction::*;
-
         let tiles = vec![
             Tile::new('|', 1, 1),
             Tile::new('-', 1, 1),
@@ -193,14 +147,13 @@ mod tests {
             Tile::new('F', 1, 1),
             Tile::new('7', 1, 1),
         ];
-
         let expected = vec![
-            vec![(North, (1, 0)), (South, (1, 2))],
-            vec![(East, (2, 1)), (West, (0, 1))],
-            vec![(North, (1, 0)), (East, (2, 1))],
-            vec![(North, (1, 0)), (West, (0, 1))],
-            vec![(South, (1, 2)), (East, (2, 1))],
-            vec![(South, (1, 2)), (West, (0, 1))],
+            vec![(1, 0), (1, 2)],
+            vec![(2, 1), (0, 1)],
+            vec![(1, 0), (2, 1)],
+            vec![(1, 0), (0, 1)],
+            vec![(1, 2), (2, 1)],
+            vec![(1, 2), (0, 1)],
         ];
         tiles
             .into_iter()
@@ -209,11 +162,10 @@ mod tests {
                 assert_eq!(tile.moves(), expected);
             });
     }
-
     #[test]
     fn test_parse_input() {
         assert_eq!(
-            Matrix::parse(
+            parse(
                 ".....
 .S-7.
 .|.|.
@@ -259,7 +211,6 @@ mod tests {
             ]
         )
     }
-
     #[test]
     fn test_process() {
         assert_eq!(
