@@ -6,46 +6,24 @@ fn main() {
 
 fn process(input: &str) -> usize {
     let matrix = Matrix::new(input);
-    let moves = matrix
-        .start()
-        .moves()
-        .iter()
-        .map(|(_, (x, y))| matrix.get(*x, *y))
-        .filter_map(|tile| {
-            if tile.moves().iter().len() == 2 {
-                Some(tile)
-            } else {
-                None
+    let start = matrix.start();
+
+    let mut queue = vec![start.clone()];
+    let mut visited = vec![];
+
+    while let Some(tile) = queue.pop() {
+        let moves = tile.moves();
+        for (_, (x, y)) in moves {
+            let tile = matrix.get(x, y);
+
+            if !visited.contains(tile) && tile.symbol() != Symbol::Ground {
+                queue.push(tile.clone());
+                visited.push(tile.clone());
             }
-        })
-        .collect::<Vec<_>>();
+        }
+    }
 
-    let mut count = 0;
-    let farthest = std::iter::successors(Some(moves.clone()), |last_moves| {
-        count += 1;
-        let symbols = last_moves.iter().map(|tile| tile.symbol()).collect::<Vec<_>>();
-        let next_moves = last_moves
-            .iter()
-            .map(|tile| tile.moves())
-            .map(|new_moves| {
-                new_moves
-                    .iter()
-                    .map(|(_, (x, y))| matrix.get(*x, *y))
-                    .filter(|tile| {
-                        !symbols.contains(&tile.symbol())
-                    })
-                    .filter(|tile| {
-                        tile.symbol() != Symbol::Ground
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-
-    }).collect::<Vec<_>>();
-
-    count
-
+    visited.len() / 2
 }
 
 struct Matrix {
