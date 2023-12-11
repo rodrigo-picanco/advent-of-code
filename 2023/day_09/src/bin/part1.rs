@@ -1,23 +1,23 @@
+use itertools::Itertools;
+
 fn main() {
     let input = include_str!("./input1.txt");
     let output = process(input);
     dbg!(output);
 }
 
+fn process(input: &str) -> isize {
+    let input = parse(input);
+    input.iter().map(|row| extrapolate(row.clone())).sum()
+}
 
 fn extrapolate(input: Vec<isize>) -> isize {
     if input.iter().all(|&x| x == 0) {
         return 0;
     }
-
-    let deltas = input.iter().skip(1).zip(input.iter()).map(|(a, b)| a - b).collect();
+    let deltas = input.iter().tuple_windows().map(|(left, right)| right - left).collect();
     let diff = extrapolate(deltas);
     input.last().expect("input is empty") + diff
-}
-
-fn process(input: &str) -> isize {
-    let input = parse(input);
-    input.iter().map(|row| extrapolate(row.clone())).sum()
 }
 
 fn parse(input: &str) -> Vec<Vec<isize>> {
@@ -34,7 +34,6 @@ fn parse(input: &str) -> Vec<Vec<isize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_parse_input() {
         assert_eq!(
@@ -50,7 +49,6 @@ mod tests {
             ]
         )
     }
-
     #[test]
     fn test_process() {
         assert_eq!(
