@@ -1,6 +1,3 @@
-use itertools::Itertools;
-use std::collections::BTreeMap;
-
 fn main() {
     let input = include_str!("./input1.txt");
     let output = process(input);
@@ -8,47 +5,55 @@ fn main() {
 }
 
 fn process(input: &str) -> usize {
-    let mut map = parse(input);
-    let mut acc = vec![];
+    let mut total = 0;
+    for line in input.lines() {
+        let (cfg, nums) = line.split_once(' ').expect("cannot split");
+        let num = nums
+            .split(',')
+            .map(|x| x.parse::<usize>().expect("should be a number"))
+            .collect();
+        total += count(cfg.chars().collect(), num);
+    }
+    total
+}
 
-    for (springs, _) in map.iter_mut() {
-        for x in 0..springs.len() {
-            let char = springs[x];
-            if char == '?' {
-                springs[x] = '.';
-                acc.push(springs.clone());
-                springs[x] = '#';
-                acc.push(springs.clone());
-                springs[x] = char;
-            } 
+fn count(cfg: Vec<char>, nums: Vec<usize>) -> usize {
+    if cfg.len() == 0 {
+        if nums.len() == 0 {
+            return 1;
+        } else {
+            return 0;
         }
     }
 
-    dbg!(acc);
+    if nums.len() == 0 {
+        if cfg.contains(&'#') {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
 
-        
+    let mut result = 0;
 
-    todo!()
-}
+    if ['?', '.'].contains(&cfg[0]) {
+        result += count(cfg[1..].to_vec(), nums.clone());
+    }
 
-fn parse(input: &str) -> Vec<(Vec<char>, Vec<usize>)> {
-    // split input into lines
-    input
-        .lines()
-        .map(|line| {
-            assert!(line.len() > 0, "line is empty");
-            let mut parts = line.split(' ');
-            (
-                parts.next().expect("cannot parse part1").chars().collect(),
-                parts
-                    .next()
-                    .expect("cannot parse part2")
-                    .split(",")
-                    .map(|x| x.parse::<usize>().expect("should be a number"))
-                    .collect(),
-            )
-        })
-        .collect()
+    if ['?', '#'].contains(&cfg[0]) {
+        if (nums[0] <= cfg.len())
+            && !cfg[..nums[0]].contains(&'.')
+            && (nums[0] == cfg.len() || cfg[nums[0]] != '#')
+        {
+            let start = cfg
+                .get(nums[0] + 1)
+                .and_then(|_| Some(cfg[nums[0] + 1..].to_vec()))
+                .unwrap_or(vec![]);
+            result += count(start, nums[1..].to_vec());
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
