@@ -9,18 +9,13 @@ fn process_input(input: &str) -> usize {
         .trim()
         .lines()
         .map(|x| {
-            let mut iterator = x
+            let chars: Vec<_> = x
                 .chars()
-                .filter_map(|c| if c.is_numeric() { Some(c) } else { None });
-            let first = iterator.next().expect("should be a number");
-            let last = iterator.last();
-
-            match last {
-                Some(last) => format!("{}{}", first, last),
-                None => format!("{}{}", first, first),
-            }
-            .parse::<usize>()
-            .expect("should be a number")
+                .filter_map(|c| c.is_numeric().then_some(c))
+                .collect();
+            let first = chars.first().expect("should be a number");
+            let last = chars.last();
+            format!("{}{}", first, last.unwrap_or(first)).parse::<usize>().expect("should be a number")
         })
         .sum()
 }
@@ -28,17 +23,15 @@ fn process_input(input: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_process() {
         assert_eq!(
             process_input(
-                "
-                    1abc2
-                    pqr3stu8vwx
-                    a1b2c3d4e5f
-                    treb7uchet
-                "
+                "\
+1abc2
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet"
             ),
             142
         );
