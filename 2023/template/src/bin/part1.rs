@@ -9,12 +9,13 @@ fn process_input(input: &str) -> usize {
         .trim()
         .lines()
         .map(|x| {
-            let chars: Vec<_> = x.chars().filter(|c| c.is_numeric()).collect();
+            let chars: Vec<_> = x
+                .chars()
+                .filter_map(|c| c.is_numeric().then_some(c))
+                .collect();
             let first = chars.first().expect("should be a number");
             let last = chars.last();
-            format!("{}{}", first, last.unwrap_or(first))
-                .parse::<usize>()
-                .expect("should be a number")
+            format!("{}{}", first, last.unwrap_or(first)).parse::<usize>().expect("should be a number")
         })
         .sum()
 }
@@ -22,7 +23,6 @@ fn process_input(input: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_process() {
         assert_eq!(

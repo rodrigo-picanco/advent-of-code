@@ -46,7 +46,7 @@ fn find_mirror(input: Vec<Vec<char>>) -> usize {
         }
     }
 
-    return 0;
+    0
 }
 
 // LOW 36500
@@ -54,27 +54,6 @@ fn find_mirror(input: Vec<Vec<char>>) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_case::test_case;
-
-    #[test_case("\
-#.##..##.
-..#.##.#.
-##......#
-##......#
-..#.##.#.
-..##..##.
-#.#.##.#.", 300 ; "first")]
-    #[test_case("\
-#...##..#
-#....#..#
-..##..###
-#####.##.
-#####.##.
-..##..###
-#....#..#",  100  ; "second")]
-    fn test_process_pattern(input: &str, output: usize) {
-        assert_eq!(process_pattern(input), output);
-    }
 
     #[test]
     fn test_process() {

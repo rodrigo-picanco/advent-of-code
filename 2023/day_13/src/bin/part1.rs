@@ -11,7 +11,6 @@ fn process(input: &str) -> usize {
 const HORIZONTAL_FACTOR: usize = 100;
 const VERTICAL_FACTOR: usize = 1;
 
-
 fn process_pattern(input: &str) -> usize {
     let lines = input
         .lines()
@@ -27,7 +26,7 @@ fn process_pattern(input: &str) -> usize {
 
     [(horizontal, HORIZONTAL_FACTOR), (vertical, VERTICAL_FACTOR)]
         .iter()
-        .find_map(|(x, y)| if let Some(x) = x { Some(x * y) } else { None })
+        .find_map(|(x, y)| x.as_ref().map(|x| x * y))
         .expect("No pattern found")
 }
 
@@ -53,27 +52,6 @@ fn find_mirror(input: Vec<Vec<char>>) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_case::test_case;
-
-    #[test_case("\
-#.##..##.
-..#.##.#.
-##......#
-##......#
-..#.##.#.
-..##..##.
-#.#.##.#.", 5 ; "vertical")]
-    #[test_case("\
-#...##..#
-#....#..#
-..##..###
-#####.##.
-#####.##.
-..##..###
-#....#..#",  400  ; "horizontal")]
-    fn test_process_pattern(input: &str, output: usize) {
-        assert_eq!(process_pattern(input), output);
-    }
 
     #[test]
     fn test_process() {

@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["day_*"]
+default-members = ["day_*"]
+
+[workspace.dependencies]
+glam = "0.24.2"
+itertools = "0.12.0"
+nom = "7.1.3"
