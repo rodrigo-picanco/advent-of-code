@@ -3,6 +3,15 @@
 version = 3
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2969dcb958b36655471fc61f7e416fa76033bdd4bfed0678d8fee1e2d07a1f0"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -75,15 +84,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "day_03"
+name = "day-01"
+version = "0.0.1"
+
+[[package]]
+name = "day-02"
+version = "0.1.0"
+dependencies = [
+ "regex",
+]
+
+[[package]]
+name = "day-03"
 version = "0.1.0"
 
 [[package]]
-name = "day_04"
+name = "day-04"
 version = "0.1.0"
 
 [[package]]
-name = "day_05"
+name = "day-05"
 version = "0.1.0"
 dependencies = [
  "indicatif",
@@ -91,7 +111,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "day_06"
+name = "day-06"
 version = "0.1.0"
 dependencies = [
  "nom",
@@ -99,7 +119,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "day_07"
+name = "day-07"
 version = "0.1.0"
 dependencies = [
  "itertools 0.12.0",
@@ -107,40 +127,47 @@ dependencies = [
 ]
 
 [[package]]
-name = "day_08"
+name = "day-08"
 version = "0.1.0"
 dependencies = [
  "nom",
 ]
 
 [[package]]
-name = "day_09"
+name = "day-09"
 version = "0.1.0"
 dependencies = [
  "itertools 0.10.5",
 ]
 
 [[package]]
-name = "day_10"
+name = "day-10"
 version = "0.1.0"
 
 [[package]]
-name = "day_11"
+name = "day-11"
 version = "0.1.0"
 dependencies = [
  "itertools 0.10.5",
 ]
 
 [[package]]
-name = "day_12"
+name = "day-12"
 version = "0.1.0"
 dependencies = [
- "itertools 0.10.5",
+ "itertools 0.12.0",
 ]
 
 [[package]]
-name = "day_13"
+name = "day-13"
 version = "0.1.0"
+
+[[package]]
+name = "day_01"
+version = "0.0.1"
+dependencies = [
+ "itertools 0.12.0",
+]
 
 [[package]]
 name = "either"
@@ -294,6 +321,35 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
 ]
+
+[[package]]
+name = "regex"
+version = "1.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "unicode-width"
