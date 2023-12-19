@@ -1,0 +1,9 @@
+[package]
+name = "day-19"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+itertools = "*"
+nom = "*"
+rstest = "0.18.2"
