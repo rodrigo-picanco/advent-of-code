@@ -1,6 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
-
-use nom::{sequence::separated_pair, IResult};
+use std::collections::HashMap;
 
 const ACCEPTED: &str = "A";
 const REJECTED: &str = "R";
@@ -94,7 +92,7 @@ enum Rule<'a> {
     Default(&'a str),
 }
 
-fn parse_condition(input: &str) -> IResult<&str, Rule> {
+fn parse_condition(input: &str) -> nom::IResult<&str, Rule> {
     let (input, field) = nom::character::complete::one_of("xmas")(input)?;
     let (input, conditional) = nom::character::complete::one_of("<>")(input)?;
     let (input, compared) = nom::character::complete::digit1(input)?;
@@ -120,7 +118,7 @@ fn parse_condition(input: &str) -> IResult<&str, Rule> {
         },
     ))
 }
-fn parse_rule_list(input: &str) -> IResult<&str, Vec<Rule>> {
+fn parse_rule_list(input: &str) -> nom::IResult<&str, Vec<Rule>> {
     let (input, rules) =
         nom::multi::separated_list1(nom::character::complete::char(','), parse_condition)(input)?;
     let (input, default) = nom::sequence::preceded(
@@ -131,10 +129,9 @@ fn parse_rule_list(input: &str) -> IResult<&str, Vec<Rule>> {
         .into_iter()
         .chain(std::iter::once(Rule::Default(default)))
         .collect::<Vec<Rule>>();
-
     Ok((input, rules))
 }
-fn parse_workflow(input: &str) -> IResult<&str, (&str, Vec<Rule>)> {
+fn parse_workflow(input: &str) -> nom::IResult<&str, (&str, Vec<Rule>)> {
     let (input, name) = nom::bytes::complete::take_until("{")(input)?;
     let (input, rules) = nom::sequence::delimited(
         nom::character::complete::char('{'),
@@ -143,20 +140,20 @@ fn parse_workflow(input: &str) -> IResult<&str, (&str, Vec<Rule>)> {
     )(input)?;
     Ok((input, (name, rules)))
 }
-fn parse_workflow_list(input: &str) -> IResult<&str, Workflows> {
+fn parse_workflow_list(input: &str) -> nom::IResult<&str, Workflows> {
     let (input, workflows) = nom::multi::many1(nom::sequence::terminated(
         parse_workflow,
         nom::branch::alt((nom::character::complete::line_ending, nom::combinator::eof)),
     ))(input)?;
     Ok((input, Workflows::new(workflows)))
 }
-fn parse_part_field(input: &str) -> IResult<&str, u32> {
+fn parse_part_field(input: &str) -> nom::IResult<&str, u32> {
     let (input, _) = nom::character::complete::one_of("xmas")(input)?;
     let (input, _) = nom::character::complete::char('=')(input)?;
     let (input, value) = nom::character::complete::digit1(input)?;
     Ok((input, value.parse::<u32>().expect("cannot parse value")))
 }
-fn parse_part(input: &str) -> IResult<&str, Part> {
+fn parse_part(input: &str) -> nom::IResult<&str, Part> {
     let (input, output) = nom::sequence::delimited(
         nom::character::complete::char('{'),
         nom::multi::separated_list1(nom::character::complete::char(','), parse_part_field),
@@ -167,16 +164,15 @@ fn parse_part(input: &str) -> IResult<&str, Part> {
         Part::new((output[0], output[1], output[2], output[3])),
     ))
 }
-fn parse_part_list(input: &str) -> IResult<&str, Vec<Part>> {
+fn parse_part_list(input: &str) -> nom::IResult<&str, Vec<Part>> {
     let (input, output) = nom::multi::many1(nom::sequence::terminated(
         parse_part,
         nom::branch::alt((nom::character::complete::line_ending, nom::combinator::eof)),
     ))(input)?;
-
     Ok((input, output))
 }
-fn parse(input: &str) -> IResult<&str, (Workflows, Vec<Part>)> {
-    let (input, (workflows, parts)) = separated_pair(
+fn parse(input: &str) -> nom::IResult<&str, (Workflows, Vec<Part>)> {
+    let (input, (workflows, parts)) = nom::sequence::separated_pair(
         parse_workflow_list,
         nom::character::complete::line_ending,
         parse_part_list,
@@ -187,7 +183,6 @@ fn parse(input: &str) -> IResult<&str, (Workflows, Vec<Part>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_parse() {
         let input = "\
@@ -208,7 +203,6 @@ pv{a>1716:R,A}
             ),
             ("pv", vec![Rule::Gt('a', 1716, "R"), Rule::Default("A")]) ,
         ]);
-
         let expected_parts = vec![
             Part::new((787, 2655, 1222, 2876)),
             Part::new((1679, 44, 2067, 496)),
