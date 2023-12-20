@@ -1,4 +1,10 @@
+use std::collections::{BTreeMap, HashMap};
+
 use nom::{sequence::separated_pair, IResult};
+
+const ACCEPTED: &str = "A";
+const REJECTED: &str = "R";
+const ENTRANCE: &str = "in";
 
 fn main() {
     let input = include_str!("./input1.txt");
@@ -6,244 +12,170 @@ fn main() {
     dbg!(output);
 }
 
-fn process_input(input: &str) -> i32 {
+fn process_input(input: &str) -> u32 {
     let (_, (workflows, parts)) = parse(input).expect("Failed to parse");
-
-    let start = workflows.iter().find(|workflow| workflow.name == "in").unwrap();
-    let mut accepted = vec![];
-    
-    for part in parts {
-        let mut queue = vec![start.clone()];
-        let part = part.clone();
-
-        while let Some(workflow) = queue.pop() {
-            let result = workflow.process(part);
-            match result {
-                Result::Destination(destination) => {
-                    match destination.as_str() {
-                        "A" => {
-                            accepted.push(part);
-                            break;
-                        },
-                        "R" => {
-                            continue;
-                        },
-                        _ => {
-
-                    let next = workflows.iter().find(|workflow| workflow.name == destination).unwrap();
-                    queue.push(next);
-                        }
-                    }
-                    
-                }
-                Result::Accepted => {
-                    accepted.push(part);
-                    break;
-                }
-                Result::Rejected => {
-                    continue;
-                }
-            }
-        }
-    };
-
-    accepted.iter().fold(0_i32, |acc, part| acc + part.x + part.m + part.a + part.s)
-
+    parts
+        .into_iter()
+        .filter(|part| workflows.process(part))
+        .map(|part| part.value())
+        .sum()
 }
-
-fn compare(value: i32, condition: Condition) -> bool {
-    match condition.conditional.as_str() {
-        "<" => value < condition.compared,
-        ">" => value > condition.compared,
-        _ => unreachable!(),
-    }
-}
-
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Part {
-    x: i32,
-    m: i32,
-    a: i32,
-    s: i32,
-}
-impl Part {
-    fn get(&self, field: char) -> i32 {
-        match field {
-            'x' => self.x,
-            'm' => self.m,
-            'a' => self.a,
-            's' => self.s,
-            _ => unreachable!(),
-        }
-    }
-}
-
 
 #[derive(Debug, PartialEq)]
-struct Workflow {
-    rules: Vec<Rule>,
-    name: String,
+struct Part {
+    values: HashMap<char, u32>,
 }
-impl Workflow {
-    fn new(rules: Vec<Rule>, name: &str) -> Self {
-        Self {
-            rules,
-            name: name.to_string(),
+impl Part {
+    fn new((x, m, a, s): (u32, u32, u32, u32)) -> Self {
+        let mut hash = HashMap::new();
+        hash.insert('x', x);
+        hash.insert('m', m);
+        hash.insert('a', a);
+        hash.insert('s', s);
+        Self { values: hash }
+    }
+    fn value(&self) -> u32 {
+        self.values.values().sum()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Workflows<'a> {
+    steps: HashMap<&'a str, Vec<Rule<'a>>>
+}
+impl<'a> Workflows<'a> {
+    fn new(steps: Vec<(&'a str, Vec<Rule<'a>>)>) -> Self {
+        Self { 
+            steps: steps.into_iter().fold(HashMap::new(), |mut acc, (key, rule)| {
+                acc.insert(key, rule);
+                acc
+            })
         }
     }
-    fn process(&self, part: Part) -> Result{
-        let mut result = Result::Rejected;
-        let rules = self.rules.clone();
-        for rule in rules {
-            match rule {
-                Rule::Condition(condition) => {
-                        if compare(part.get(condition.field), condition.clone()) {
-                            result = Result::Destination(condition.destination);
+
+    fn is_decision(destination: &str) -> bool {
+        destination == ACCEPTED || destination == REJECTED
+    }
+
+    fn process(&self, part: &Part) -> bool {
+        let mut destination = ENTRANCE;
+
+        while !Self::is_decision(&destination) {
+            let rules = self.steps.get(destination).unwrap();
+            for rule in rules.iter() {
+                match rule {
+                    Rule::Lt(key, value, new_destination) => {
+                        if part.values.get(&key).unwrap() < &value {
+                            destination = new_destination;
                             break;
                         }
-                }
-                Rule::Result(r) => {
-                    result = r;
-                    break;
+                    }
+                    Rule::Gt(key, value, new_destination) => {
+                        if part.values.get(&key).unwrap() > &value {
+                            destination = new_destination;
+                            break;
+                        }
+                    }
+                    Rule::Default(new_destination) => {
+                        destination = new_destination;
+                    }
                 }
             }
-
-
         }
-        result
+
+        destination == ACCEPTED
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum Result {
-    Accepted,
-    Rejected,
-    Destination(String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct Condition {
-    field: char,
-    conditional: String,
-    compared: i32,
-    destination: String,
-}
-impl Condition {
-    fn new(field: char, conditional: &str, compared: i32, destination: &str) -> Self {
-        Self {
-            field,
-            conditional: conditional.to_string(),
-            destination: destination.to_string(),
-            compared,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum Rule {
-    Condition(Condition),
-    Result(Result),
+#[derive(PartialEq, Debug, Clone)]
+enum Rule<'a> {
+    Lt(char, u32, &'a str),
+    Gt(char, u32, &'a str),
+    Default(&'a str),
 }
 
 fn parse_condition(input: &str) -> IResult<&str, Rule> {
     let (input, field) = nom::character::complete::one_of("xmas")(input)?;
-    let (input, conditional) = nom::multi::many1(nom::character::complete::one_of("<>"))(input)?;
+    let (input, conditional) = nom::character::complete::one_of("<>")(input)?;
     let (input, compared) = nom::character::complete::digit1(input)?;
     let (input, destination) = nom::sequence::preceded(
         nom::character::complete::char(':'),
         nom::character::complete::alpha1,
     )(input)?;
+
     Ok((
         input,
-        Rule::Condition(Condition::new(
-            field,
-            &conditional.iter().collect::<String>(),
-            i32::from_str_radix(compared, 10).expect("cannot parse compared"),
-            destination,
-        )),
+        match conditional {
+            '<' => Rule::Lt(
+                field,
+                compared.parse::<u32>().expect("cannot parse value"),
+                destination,
+            ),
+            '>' => Rule::Gt(
+                field,
+                compared.parse::<u32>().expect("cannot parse value"),
+                destination,
+            ),
+            _ => Rule::Default(destination),
+        },
     ))
-}
-fn parse_result(input: &str) -> IResult<&str, Rule> {
-    let (input, result) = nom::branch::alt((
-        nom::bytes::complete::tag("A"),
-        nom::bytes::complete::tag("R"),
-        nom::character::complete::alpha1,
-    ))(input)?;
-    Ok((
-        input,
-        Rule::Result(match result {
-            "A" => Result::Accepted,
-            "R" => Result::Rejected,
-            _ => Result::Destination(result.to_string()),
-        }),
-    ))
-}
-fn parse_rule(input: &str) -> IResult<&str, Rule> {
-    let (input, rule) = nom::branch::alt((parse_condition, parse_result))(input)?;
-    Ok((input, rule))
 }
 fn parse_rule_list(input: &str) -> IResult<&str, Vec<Rule>> {
     let (input, rules) =
-        nom::multi::separated_list1(nom::character::complete::char(','), parse_rule)(input)?;
+        nom::multi::separated_list1(nom::character::complete::char(','), parse_condition)(input)?;
+    let (input, default) = nom::sequence::preceded(
+        nom::character::complete::char(','),
+        nom::character::complete::alpha1,
+    )(input)?;
+    let rules = rules
+        .into_iter()
+        .chain(std::iter::once(Rule::Default(default)))
+        .collect::<Vec<Rule>>();
+
     Ok((input, rules))
 }
-fn parse_workflow(input: &str) -> IResult<&str, Workflow> {
+fn parse_workflow(input: &str) -> IResult<&str, (&str, Vec<Rule>)> {
     let (input, name) = nom::bytes::complete::take_until("{")(input)?;
     let (input, rules) = nom::sequence::delimited(
         nom::character::complete::char('{'),
         parse_rule_list,
         nom::character::complete::char('}'),
     )(input)?;
-
-    Ok((input, Workflow::new(rules, name)))
+    Ok((input, (name, rules)))
 }
-fn parse_workflow_list(input: &str) -> IResult<&str, Vec<Workflow>> {
+fn parse_workflow_list(input: &str) -> IResult<&str, Workflows> {
     let (input, workflows) = nom::multi::many1(nom::sequence::terminated(
         parse_workflow,
         nom::branch::alt((nom::character::complete::line_ending, nom::combinator::eof)),
     ))(input)?;
-    Ok((input, workflows))
+    Ok((input, Workflows::new(workflows)))
 }
-fn parse_part_field(input: &str) -> IResult<&str, (char, i32)> {
-    let (input, field) = nom::character::complete::one_of("xmas")(input)?;
+fn parse_part_field(input: &str) -> IResult<&str, u32> {
+    let (input, _) = nom::character::complete::one_of("xmas")(input)?;
     let (input, _) = nom::character::complete::char('=')(input)?;
     let (input, value) = nom::character::complete::digit1(input)?;
-    Ok((
-        input,
-        (
-            field,
-            i32::from_str_radix(value, 10).expect("cannot parse value"),
-        ),
-    ))
+    Ok((input, value.parse::<u32>().expect("cannot parse value")))
 }
 fn parse_part(input: &str) -> IResult<&str, Part> {
     let (input, output) = nom::sequence::delimited(
-            nom::character::complete::char('{'),
-            nom::multi::separated_list1(nom::character::complete::char(','), parse_part_field),
-            nom::character::complete::char('}')
-        )(input)?;
+        nom::character::complete::char('{'),
+        nom::multi::separated_list1(nom::character::complete::char(','), parse_part_field),
+        nom::character::complete::char('}'),
+    )(input)?;
     Ok((
-            input,
-            Part {
-                x: output[0].1,
-                m: output[1].1,
-                a: output[2].1,
-                s: output[3].1
-            }
-            ))
-
+        input,
+        Part::new((output[0], output[1], output[2], output[3])),
+    ))
 }
-
 fn parse_part_list(input: &str) -> IResult<&str, Vec<Part>> {
     let (input, output) = nom::multi::many1(nom::sequence::terminated(
-            parse_part,
+        parse_part,
         nom::branch::alt((nom::character::complete::line_ending, nom::combinator::eof)),
     ))(input)?;
 
     Ok((input, output))
 }
-fn parse(input: &str) -> IResult<&str, (Vec<Workflow>, Vec<Part>)> {
+fn parse(input: &str) -> IResult<&str, (Workflows, Vec<Part>)> {
     let (input, (workflows, parts)) = separated_pair(
         parse_workflow_list,
         nom::character::complete::line_ending,
@@ -255,112 +187,6 @@ fn parse(input: &str) -> IResult<&str, (Vec<Workflow>, Vec<Part>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::rstest;
-
-    #[rstest]
-    #[case("x=787", ('x', 787))]
-    #[case("m=2655", ('m', 2655))]
-    #[case("a=1222", ('a', 1222))]
-    #[case("s=2876", ('s', 2876))]
-    fn test_parse_part_field(#[case] input: &str, #[case] expected: (char, i32)) {
-        let (_, output) = parse_part_field(input).expect("Failed to parse part field");
-        assert_eq!(output, expected);
-    }
-
-    #[test]
-    fn test_parse_part_list() {
-        let input = "\
-{x=787,m=2655,a=1222,s=2876}
-{x=1679,m=44,a=2067,s=496}";
-        let (_, output) = parse_part_list(input).expect("Failed to parse part list");
-        assert_eq!(
-            output,
-            vec![
-                Part { x: 787, m: 2655, a: 1222, s: 2876 },
-                Part { x: 1679, m: 44, a: 2067, s: 496},
-            ] as Vec<Part>
-        );
-    }
-
-    #[rstest]
-    #[case("a<2006:qkq", Rule::Condition(Condition::new('a', "<", 2006, "qkq")))]
-    #[case("m>2090:A", Rule::Condition(Condition::new('m', ">", 2090, "A")))]
-    #[case("A", Rule::Result(Result::Accepted))]
-    #[case("R", Rule::Result(Result::Rejected))]
-    fn test_parse_rule(#[case] input: &str, #[case] expected: Rule) {
-        let (_, rule) = parse_rule(input).expect("Failed to parse rule");
-        assert_eq!(rule, expected);
-    }
-
-    #[rstest]
-    #[case((200, Condition::new('a', "<", 2000, "qkq")), true)]
-    #[case((200, Condition::new('a', ">", 10, "qkq")), true)]
-    #[case((200, Condition::new('a', ">", 200, "qkq")), false)]
-    fn test_compare(#[case] input: (i32, Condition), #[case] expected: bool) {
-        let (value, condition) = input;
-        assert_eq!(compare(value, condition), expected);
-    }
-
-    #[rstest]
-    #[case("a<2006:qkq,m>2090:A,rfg", vec![
-        Rule::Condition(Condition::new('a', "<", 2006, "qkq")),
-        Rule::Condition(Condition::new('m', ">", 2090, "A")),
-        Rule::Result(Result::Destination("rfg".to_string())),
-    ])]
-    #[case("a>1716:R,A", vec![
-        Rule::Condition(Condition::new('a', ">", 1716, "R")),
-        Rule::Result(Result::Accepted),
-    ])]
-    fn test_parse_rule_list(#[case] input: &str, #[case] expected: Vec<Rule>) {
-        let (_, rules) = parse_rule_list(input).expect("Failed to parse rule list");
-        assert_eq!(rules, expected);
-    }
-
-    #[rstest]
-    #[case("px{a<2006:qkq,m>2090:A,rfg}", 
-           Workflow::new(
-            vec![
-                Rule::Condition(Condition::new('a', "<", 2006, "qkq")),
-                Rule::Condition(Condition::new('m', ">", 2090, "A")),
-                Rule::Result(Result::Destination("rfg".to_string())),
-            ], "px"))]
-    #[case("pv{a>1716:R,A}", Workflow::new(
-            vec![
-                Rule::Condition(Condition::new('a', ">", 1716, "R")),
-                Rule::Result(Result::Accepted),
-            ], "pv"))]
-    fn test_parse_workflow(#[case] input: &str, #[case] expected: Workflow) {
-        let (_, workflow) = parse_workflow(input).expect("Failed to parse workflow");
-        assert_eq!(workflow, expected);
-    }
-
-    #[test]
-    fn test_parse_workflow_list() {
-        let input = "\
-px{a<2006:qkq,m>2090:A,rfg}
-pv{a>1716:R,A}";
-        let (_, workflows) = parse_workflow_list(input).expect("Failed to parse workflow list");
-        assert_eq!(
-            workflows,
-            vec![
-                Workflow::new(
-                    vec![
-                        Rule::Condition(Condition::new('a', "<", 2006, "qkq")),
-                        Rule::Condition(Condition::new('m', ">", 2090, "A")),
-                        Rule::Result(Result::Destination("rfg".to_string())),
-                    ],
-                    "px"
-                ),
-                Workflow::new(
-                    vec![
-                        Rule::Condition(Condition::new('a', ">", 1716, "R")),
-                        Rule::Result(Result::Accepted),
-                    ],
-                    "pv"
-                ),
-            ]
-        );
-    }
 
     #[test]
     fn test_parse() {
@@ -371,31 +197,25 @@ pv{a>1716:R,A}
 {x=787,m=2655,a=1222,s=2876}
 {x=1679,m=44,a=2067,s=496}";
         let (_, (workflows, parts)) = parse(input).expect("Failed to parse");
-        let expected_workflows = vec![
-            Workflow::new(
-                vec![
-                    Rule::Condition(Condition::new('a', "<", 2006, "qkq")),
-                    Rule::Condition(Condition::new('m', ">", 2090, "A")),
-                    Rule::Result(Result::Destination("rfg".to_string())),
-                ],
+        let expected_workflows = Workflows::new(vec![
+            (
                 "px",
-            ),
-            Workflow::new(
                 vec![
-                    Rule::Condition(Condition::new('a', ">", 1716, "R")),
-                    Rule::Result(Result::Accepted),
+                    Rule::Lt('a', 2006, "qkq"),
+                    Rule::Gt('m', 2090, &"A"),
+                    Rule::Default("rfg"),
                 ],
-                "pv",
             ),
-        ];
+            ("pv", vec![Rule::Gt('a', 1716, "R"), Rule::Default("A")]) ,
+        ]);
+
         let expected_parts = vec![
-            Part { x: 787, m: 2655, a: 1222, s: 2876 },
-            Part { x: 1679, m: 44, a: 2067, s: 496 },
+            Part::new((787, 2655, 1222, 2876)),
+            Part::new((1679, 44, 2067, 496)),
         ];
         assert_eq!(workflows, expected_workflows);
         assert_eq!(parts, expected_parts);
     }
-
     #[test]
     fn test_process() {
         assert_eq!(
