@@ -6,92 +6,66 @@ fn main() {
     dbg!(output);
 }
 
-const LOW: &'static str = "low";
-const HIGH: &'static str = "high";
-const ON: &'static str = "on";
-const OFF: &'static str = "off";
-
-fn process_input(input: &str) -> usize {
+fn process_input(input: &str) -> u32 {
     let mut configuration = Configuration::from(input);
-    let mut high = 0;
-    let mut low = 0;
 
     for _ in 0..1000 {
-        low += 1;
-        let mut queue = configuration
-            .broadcast_targets
-            .iter()
-            .map(|x| ("broadcaster".to_string(), x.to_owned(), LOW.to_string()))
-            .collect::<VecDeque<(String, String, String)>>();
-        while let Some((origin, target, pulse)) = queue.pop_front() {
-            if &pulse == LOW {
-                low += 1;
-            } else {
-                high += 1;
-            }
-            if !configuration.modules.contains_key(&target) {
-                continue;
-            }
-            let module = configuration.modules.get_mut(&target).unwrap();
-            if module.type_ == "%" {
-                if pulse == LOW {
-                    module.memory.insert(
-                        "state".to_string(),
-                        match module.memory.get("state").unwrap().as_str() {
-                            ON => OFF.to_string(),
-                            OFF => ON.to_string(),
-                            _ => panic!("Invalid state"),
-                        },
-                    );
-                    let outgoing = match module.memory.get("state").unwrap().as_str() {
-                        ON => HIGH,
-                        OFF => LOW,
-                        _ => panic!("Invalid state"),
-                    };
-                    for output in module.outputs.iter() {
-                        queue.push_back((target.clone(), output.to_owned(), outgoing.to_string()));
-                    }
-                }
-            } else {
-                module.memory.insert(origin, pulse);
-                let outgoing = match module.memory.values().all(|x| x == HIGH) {
-                    true => LOW,
-                    false => HIGH,
-                };
-                for output in module.outputs.iter() {
-                    queue.push_back((target.clone(), output.to_owned(), outgoing.to_string()));
-                }
-            }
-        }
+        configuration.run();
     }
-    high * low
+
+    configuration.pulse_counter.high * configuration.pulse_counter.low
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+enum Pulse {
+    Low,
+    High,
+}
+
+#[derive(Debug, PartialEq)]
+enum State {
+    On,
+    Off,
+}
+
+#[derive(Debug, PartialEq)]
+enum ModuleType {
+    Conjuction,
+    FlipFlop(State),
+    Broadcaster,
 }
 
 struct Module {
-    name: String,
-    type_: String,
+    module_type: ModuleType,
     outputs: Vec<String>,
-    memory: HashMap<String, String>,
+    memory: HashMap<String, Pulse>,
 }
 impl Module {
-    fn new(name: String, type_: String, outputs: Vec<String>) -> Self {
-        let mut memory = HashMap::new();
-        if type_ == "%" {
-            memory.insert("state".to_string(), OFF.to_string());
-        }
+    fn new(type_: String, outputs: Vec<String>) -> Self {
         Self {
-            name,
-            type_,
+            module_type: match type_.as_str() {
+                "%" => ModuleType::FlipFlop(State::Off),
+                "&" => ModuleType::Conjuction,
+                "broadcaster" => ModuleType::Broadcaster,
+                _ => panic!("Invalid module type"),
+            },
             outputs,
-            memory,
+            memory: HashMap::new(),
         }
     }
+}
+
+struct PulseCounter {
+    high: u32,
+    low: u32,
 }
 
 struct Configuration {
     modules: HashMap<String, Module>,
     broadcast_targets: Vec<String>,
+    pulse_counter: PulseCounter,
 }
+
 impl From<&str> for Configuration {
     fn from(input: &str) -> Self {
         let mut modules = HashMap::new();
@@ -108,31 +82,86 @@ impl From<&str> for Configuration {
                 let name = left.chars().skip(1).collect::<String>();
                 modules.insert(
                     name.clone(),
-                    Module::new(name, type_, outputs.collect::<Vec<String>>()),
+                    Module::new(type_, outputs.collect::<Vec<String>>()),
                 );
             }
         }
-
-        let mut modifications: Vec<(String, String, String)> = Vec::new();
+        let mut modifications: Vec<(String, String, Pulse)> = Vec::new();
         for (name, module) in &modules {
             for output in &module.outputs {
                 if let Some(output_module) = modules.get(output) {
-                    if output_module.type_ == "&" {
-                        modifications.push((output.to_string(), name.clone(), "lo".to_string()));
+                    if output_module.module_type == ModuleType::Conjuction {
+                        modifications.push((output.to_string(), name.clone(), Pulse::Low));
                     }
                 }
             }
         }
-
         for (output, name, value) in modifications {
             if let Some(output_module) = modules.get_mut(&output) {
                 output_module.memory.insert(name, value);
             }
         }
-
         Self {
             modules,
             broadcast_targets,
+            pulse_counter: PulseCounter { high: 0, low: 0 },
+        }
+    }
+}
+
+impl Configuration {
+    fn increment(&mut self, pulse: Pulse) {
+        match pulse {
+            Pulse::Low => self.pulse_counter.low += 1,
+            Pulse::High => self.pulse_counter.high += 1,
+        }
+    }
+    fn run(&mut self) {
+        self.increment(Pulse::Low);
+
+        let mut queue = self
+            .broadcast_targets
+            .iter()
+            .map(|x| ("broadcaster".to_string(), x.to_owned(), Pulse::Low))
+            .collect::<VecDeque<(String, String, Pulse)>>();
+
+        while let Some((origin, target, pulse)) = queue.pop_front() {
+            self.increment(pulse);
+
+            match self.modules.get_mut(&target) {
+                Some(module) => match module.module_type {
+                    ModuleType::FlipFlop(_) => {
+                        if pulse == Pulse::Low {
+                            module.module_type = match module.module_type {
+                                ModuleType::FlipFlop(State::On) => ModuleType::FlipFlop(State::Off),
+                                ModuleType::FlipFlop(State::Off) => ModuleType::FlipFlop(State::On),
+                                _ => panic!("Module type mismatch"),
+                            };
+
+                            let outgoing = match module.module_type {
+                                ModuleType::FlipFlop(State::On) => Pulse::High,
+                                ModuleType::FlipFlop(State::Off) => Pulse::Low,
+                                _ => panic!("Module type mismatch"),
+                            };
+
+                            for output in module.outputs.iter() {
+                                queue.push_back((target.clone(), output.to_owned(), outgoing));
+                            }
+                        }
+                    }
+                    _ => {
+                        module.memory.insert(origin, pulse);
+                        let outgoing = match module.memory.values().all(|x| *x == Pulse::High) {
+                            true => Pulse::Low,
+                            false => Pulse::High,
+                        };
+                        for output in module.outputs.iter() {
+                            queue.push_back((target.clone(), output.to_owned(), outgoing));
+                        }
+                    }
+                },
+                None => continue,
+            }
         }
     }
 }
@@ -160,7 +189,7 @@ broadcaster -> a
 &con -> output",
         11687500
     )]
-    fn test_process(#[case] input: &str, #[case] expected: usize) {
+    fn test_process(#[case] input: &str, #[case] expected: u32) {
         assert_eq!(process_input(input), expected);
     }
 }
