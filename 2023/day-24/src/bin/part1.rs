@@ -8,175 +8,88 @@ fn main() {
 }
 
 fn process_input(input: &str, test_area: RangeInclusive<isize>) -> usize {
-    let points = parse(input);
-    let mut crossings = 0;
-    for x in 0..points.len() {
-        for y in (x+1)..points.len() {
-            if is_crossing(points[x].clone(), points[y].clone(), &test_area) {
-                crossings += 1;
+    let mut hailstones = parse(input);
+
+    let mut total = 0;
+
+    for (i, hs1) in hailstones.iter().enumerate() {
+        for hs2 in hailstones.iter().skip(i + 1) {
+            let (a1, b1, c1) = (hs1.a, hs1.b, hs1.c);
+            let (a2, b2, c2) = (hs2.a, hs2.b, hs2.c);
+
+            // Skip parallel
+            if a1 * b2 == a2 * b1 {
+                continue;
+            }
+
+            let x = (c1 * b2 - c2 * b1) as f64 / (a1 * b2 - a2 * b1) as f64;
+            let y = (c2 * a1 - c1 * a2) as f64 / (a1 * b2 - a2 * b1) as f64;
+
+            if x >= *test_area.start() as f64
+                && x <= *test_area.end() as f64
+                && y >= *test_area.start() as f64
+                && y <= *test_area.end() as f64
+            {
+                if [hs1, hs2]
+                    .iter()
+                    .all(|hs| (x - hs.sx) * hs.vx >= 0 as f64 && (y - hs.sy) * hs.vy >= 0 as f64)
+                {
+                    total += 1;
+                }
             }
         }
     }
-    crossings
+
+    total
 }
 
-#[derive(Clone, Debug)]
-struct Coordinate {
-    position: isize,
-    velocity: isize,
+#[derive(Debug)]
+struct Hailstone {
+    sx: f64,
+    sy: f64,
+    sz: f64,
+    vx: f64,
+    vy: f64,
+    vz: f64,
+    a: f64,
+    b: f64,
+    c: f64,
 }
-
-#[derive(Clone, Debug)]
-struct Point {
-    x: Coordinate,
-    y: Coordinate,
-}
-impl Point {
-    fn new((x_pos, y_pos, x_vecty, y_vecty): (isize, isize, isize, isize)) -> Self {
+impl Hailstone {
+    fn new(sx: isize, sy: isize, sz: isize, vx: isize, vy: isize, vz: isize) -> Self {
         Self {
-            x: Coordinate {
-                position: x_pos, 
-                velocity: x_vecty,
-            },
-            y: Coordinate {
-                position: y_pos,
-                velocity: y_vecty,
-            },
+            sx: sx as f64,
+            sy: sy as f64,
+            sz: sz as f64,
+            vx: vx as f64,
+            vy: vy as f64,
+            vz: vz as f64,
+            a: vy as f64,
+            b: -vx as f64,
+            c: (vy * sx - vx * sy) as f64,
         }
     }
 }
 
-
-fn parse_line(input: &str) -> Point {
-    let parts = input.split(" @ ").collect::<Vec<_>>();
-    let position = parts[0].split(", ").collect::<Vec<_>>();
-    let velocity = parts[1].split(", ").collect::<Vec<_>>();
-
-    Point::new((
-        position[0].trim().parse().unwrap(),
-        position[1].trim().parse().unwrap(),
-        velocity[0].trim().parse().unwrap(),
-        velocity[1].trim().parse().unwrap(),
-    ))
-}
-fn parse(input: &str) -> Vec<Point> {
-    input.lines().map(parse_line).collect()
-}
-
-fn time(point: Coordinate, area: &RangeInclusive<isize>) -> usize {
-    if point.velocity > 0 {
-        ((point.position - *area.end()) / point.velocity).abs() as usize
-    } else {
-        ((point.position - *area.start()) / point.velocity).abs() as usize 
-    }
-}
-
-fn smallest_time(a: Point, b: Point, area: &RangeInclusive<isize>) -> usize {
-    let a_x = time(a.x, &area); 
-    let b_x = time(b.x, &area);
-    let a_y = time(a.y, &area);
-    let b_y = time(b.y, &area);
-    std::cmp::min(std::cmp::min(a_x, b_x), std::cmp::min(a_y, b_y))
-}
-
-fn position_in_time(point: &Point, time: usize) -> Point {
-    Point {
-        x: Coordinate {
-            position: point.x.position + (point.x.velocity * time as isize),
-            velocity: point.x.velocity,
-        },
-        y: Coordinate {
-            position: point.y.position + (point.y.velocity * time as isize),
-            velocity: point.y.velocity,
-        },
-    }
-}
-
-fn is_crossing(a: Point, b: Point, area: &RangeInclusive<isize>) -> bool {
-    let time = smallest_time(a.clone(), b.clone(), area);
-
-    let a_end = position_in_time(&a, time);
-    let b_end = position_in_time(&b, time);
-
-    let range_start_x = a.x.position.min(a_end.x.position);
-    let range_end_x = a.x.position.max(a_end.x.position);
-    let range_start_y = a.y.position.min(a_end.y.position);
-    let range_end_y = a.y.position.max(a_end.y.position);
-
-    let range_x = range_start_x..=range_end_x;
-    let range_y = range_start_y..=range_end_y;
-
-    range_x.contains(&b_end.x.position) && range_y.contains(&b_end.y.position)
+fn parse(input: &str) -> Vec<Hailstone> {
+    input
+        .lines()
+        .map(|line| {
+            let values = line
+                .replace("@", ",")
+                .split(",")
+                .map(|s| s.trim().parse::<isize>().unwrap())
+                .collect::<Vec<_>>();
+            Hailstone::new(
+                values[0], values[1], values[2], values[3], values[4], values[5],
+            )
+        })
+        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::rstest;
-
-    #[rstest]
-    #[case(
-        Coordinate {
-                position: 19,
-                velocity: -2,
-            },
-        6
-        )]
-    #[case(
-        Coordinate {
-                position: 13,
-                velocity: 1,
-            },
-        14 
-        )]
-    fn test_time(#[case] coord: Coordinate, #[case] expected: usize) {
-        let area = 7..=27;
-        assert_eq!(time(coord, &area), expected);
-    }
-
-    #[test]
-    fn test_smallest_time() {
-        let a = Point {
-            x: Coordinate {
-                position: 19,
-                velocity: -2,
-            },
-            y: Coordinate {
-                position: 13,
-                velocity: 1,
-            },
-        };
-        let b = Point {
-            x: Coordinate {
-                position: 18,
-                velocity: -1,
-            },
-            y: Coordinate {
-                position: 19,
-                velocity: -1,
-            },
-        };
-        let area = 7..=27;
-        assert_eq!(smallest_time(a, b, &area), 6);
-    }
-
-    #[rstest]
-    #[case((19, 13, -2, 1), (18, 19, -1, -1), true)]
-    #[case((19, 13, -2, 1), (20, 25, -2, -2), true)]
-    #[case((19, 13, -2, 1), (20, 19, 1, -5), false)]
-    #[case((18, 19, -1, -1), (12, 31, -1, -2), false)]
-    #[case((18, 19, -1, -1), (20, 19, 1, -5), false)]
-    #[case((20, 25, -2, -2), (12, 31, -1, -2), false)]
-    #[case((20, 25, -2, -2), (20, 19, 1, -5), false)]
-    #[case((12, 31, -1, -2), (20, 19, 1, -5), false)]
-    fn test_is_crossing(#[case] a: (isize, isize, isize, isize), #[case] b: (isize, isize, isize, isize), #[case] expected: bool) {
-        let area = 7..=27;
-        assert_eq!(is_crossing(
-Point::new(a),
-Point::new(b),
-                &area), expected);
-    }
-
     #[test]
     fn test_process() {
         let input = "\
