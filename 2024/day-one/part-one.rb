@@ -10,25 +10,16 @@ class PartOne < Puzzle
   end
 
   def run(parsed)
-    first_col, second_col = parsed
-    first_sort = first_col.sort
-    second_sort = second_col.sort
-
-    diff = []
-    first_sort.zip(second_sort).map do |first, second|
-      diff << (first - second).abs
+    parsed.first.sort.zip(parsed.last.sort).map do |first, second|
+      (first - second).abs
     end
-
-    diff.sum
+    .sum
   end
 
   def parse(input)
-    first_col, second_col = [], []
-    input.split("\n").each do |line|
-      values = line.strip.split(' ')
-      first_col << values[0].to_i
-      second_col << values[1].to_i
+    input.split("\n").map do |line|
+      line.strip.split(' ').map(&:to_i)
     end
-    [first_col, second_col]
+    .transpose
   end
 end
