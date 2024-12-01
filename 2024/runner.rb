@@ -13,12 +13,12 @@ module Runner
           puts CLI::UI.fmt "{{gray:Running day #{day}}}"
           generate_files day if !Dir.exist? "./day-#{day}"
 
-          if sovlved?(day, 'one') && sovlved?(day, 'two')
+          if solved?(day, 'one') && solved?(day, 'two')
             puts CLI::UI.fmt "{{green:Day #{day} already solved  ⭐⭐!}}"
             next
           end
 
-          if sovlved? day, 'one'
+          if solved? day, 'one'
             puts CLI::UI.fmt "{{green:Part one already solved}}"
             puts CLI::UI.fmt "{{gray:Running part two}}"
             run_part day, 'two'
@@ -72,7 +72,7 @@ module Runner
     end
   end
 
-  def self.sovlved?(day, part)
+  def self.solved?(day, part)
     File.exist? "./day-#{day}/part-#{part}-result"
   end
 
