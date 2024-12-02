@@ -10,39 +10,14 @@ class PartTwo < Puzzle
   end
 
   def run(reports)
-    reports.filter_map do |report| 
-      safe = safe? report 
-      if !safe 
-        report.each_with_index do |_, i|
-          if safe? report[0...i] + report[(i+1)..]
-            safe = true
-            break
-          end
-        end
-      end
-      safe
-    end.count 
+    reports.filter_map do |report|
+      report.combination(report.length - 1).find { |permutation| safe? permutation }&.any?
+    end.count
   end
 
   def safe?(report)
-    return false if !incrementing_or_decrementing? report 
-    safe = true
-    report[0..-2].zip(report[1..]).each do |a, b|
-      if !safe_range?(a, b)
-        safe = false
-        break
-      end
-    end
-    safe
-  end
-
-  def safe_range?(a, b)
-    diff = (a - b).abs
-    return diff >= 1 && diff <= 3
-  end
-
-  def incrementing_or_decrementing?(report)
-    report.dup.sort == report || report.dup.sort.reverse == report
+    (report.dup.sort == report || report.dup.sort.reverse == report) &&
+    report.each_cons(2).find{ |a, b| !(a - b).abs.between?(1, 3) }.nil?
   end
 
   def parse(input)
