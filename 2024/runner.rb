@@ -15,7 +15,7 @@ module Runner
 
           if solved?(day, 'one') && solved?(day, 'two')
             puts CLI::UI.fmt "{{green:Day #{day} already solved  ⭐⭐!}}"
-            next
+            self.start
           end
 
           if solved? day, 'one'
@@ -88,6 +88,7 @@ module Runner
           run_part day, 'two'
         else
           puts CLI::UI.fmt "{{green:Awesome! ⭐⭐ Now it's time for a 🍪.}}" 
+          self.start
         end
       else
         puts CLI::UI.fmt "{{red:💩}}"
