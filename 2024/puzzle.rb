@@ -6,6 +6,7 @@ class Puzzle
     @example_output = example_output
     @example_input = File.read(example_path)
     @puzzle_input = File.read(input_path)
+    @solve = false
   end
 
   def assert
@@ -18,7 +19,8 @@ class Puzzle
   end
 
   def solve
-    run parse @puzzle_input
+    @solve = true
+    run parse(@puzzle_input) 
   end
 
   def parse(input)
@@ -30,4 +32,17 @@ class Puzzle
   end
 end
 
+module Grid
+  def directions
+    {
+      up: [0, -1],
+      right: [1, 0],
+      bottom: [0, 1],
+      left: [-1, 0]
+    }
+  end
 
+  def parse_grid(input)
+    input.each_lines.to_a.map(&:chars)
+  end
+end
