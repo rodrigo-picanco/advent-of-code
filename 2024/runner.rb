@@ -1,6 +1,7 @@
 require 'cli/ui'
 require 'filewatcher'
 require 'byebug'
+require_relative './puzzle'
 
 module Runner
   def self.start 
